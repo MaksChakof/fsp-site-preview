@@ -1,0 +1,1 @@
+var e=`(max-width: 767px)`,t=`(prefers-reduced-motion: reduce)`,n=`(min-width: 767.02px) and (prefers-reduced-motion: no-preference)`;export{e as n,t as r,n as t};

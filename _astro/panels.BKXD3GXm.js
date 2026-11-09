@@ -1,0 +1,1 @@
+import"./lenis.BDPpXNNm.js";import{r as e}from"./motion.DMwRVzuw.js";import{t}from"./moving.CVO1mZLD.js";e.matchMedia().add(t,()=>{document.querySelectorAll(`[data-panel-slot]`).forEach(t=>{e.fromTo(t.querySelector(`img`),{scale:1.15},{scale:1,ease:`none`,scrollTrigger:{trigger:t,start:`top bottom`,end:t.dataset.parallaxScrollEnd,scrub:!0}})})});

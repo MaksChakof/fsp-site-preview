@@ -1,0 +1,1 @@
+var e=e=>new Promise((t,n)=>{let r=document.createElement(`script`);r.src=e,r.onload=t,r.onerror=n,document.head.append(r)});export{e as t};

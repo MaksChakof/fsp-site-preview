@@ -1,0 +1,1 @@
+var e=document.querySelector(`.section-head`),t=e=>{e.style.transition=`none`;let t=parseFloat(getComputedStyle(e).top);return e.style.transition=``,t},n=n=>t(n)-t(e);export{n as t};

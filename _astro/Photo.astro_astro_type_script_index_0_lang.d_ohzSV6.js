@@ -1,0 +1,1 @@
+import"./parallax.DO2h7Inh.js";
