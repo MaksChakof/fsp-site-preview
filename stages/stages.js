@@ -901,8 +901,12 @@ function sizeAll() {   // site: 1em = 16 px of the layout, the cell is 720 x 521
   FIT = wide ? [36, 33, CELL_W - 72, 460] : [12, 12, CELL_W - 24, CELL_H - 24];
   FIT_H = wide ? [(CELL_W - 542) / 2, 33, 542, 460] : FIT;
   document.documentElement.style.setProperty('--u', U.toFixed(4) + 'px');
-  DPR = Math.min(2, window.devicePixelRatio || 1);
-  LW = 1 / U; DASH = [3 / U, 3 / U];
+  // Narrower than the frame's 720 (a phone), the drawing is smaller and its lines thin with it, as thin to the house as in the frame
+  // (Maksim 16.11: «стали почему-то жирные линии. Раньше они как-то были тоненько»): 1 px stayed, and the close lines of a slab merged into one.
+  // The phone's canvas keeps its screen's own sharpness, up to 3x, instead of a 2x canvas stretched over it
+  const thin = Math.min(1, CELL_W / 720);
+  DPR = Math.min(wide ? 2 : 3, window.devicePixelRatio || 1);
+  LW = thin / U; DASH = [3 * thin / U, 3 * thin / U];
   const w = Math.round(CELL_W * U * DPR), h = Math.round(CELL_H * U * DPR);
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   layoutRuler();
