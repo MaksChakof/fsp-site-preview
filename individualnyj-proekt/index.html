@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="ru"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Индивидуальный проект дома: архитектор, цена и шаги работы, ФСП АРТ</title><meta name="description" content="Дом по индивидуальному проекту: плоская кровля, консоли, большие окна. Архитектор рисует дом под вашу семью и участок, стоимость проекта засчитывается в стоимость дома."><meta name="robots" content="noindex, nofollow"><!-- inline: a module script runs after Chrome has already restored the scroll on reload;
-         data-intro hides animated text until its intro takes it (set before the first paint) --><script>if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; document.documentElement.dataset.intro = 'on';</script><!-- Tests for the phone. The text (styles/air.css): ?air on the address turns it on for the visit, ?air=0 off. The chart of «Этапы и сроки»
-         (Schedule.astro): ?gantt=list, ?gantt=0 back --><script>try { const q = new URLSearchParams(location.search).get('air'); if (q !== null) q === '0' ? sessionStorage.removeItem('air') : sessionStorage.setItem('air', '1'); if (sessionStorage.getItem('air')) document.documentElement.dataset.air = ''; const g = new URLSearchParams(location.search).get('gantt'); if (g !== null) g === '0' ? sessionStorage.removeItem('gantt') : sessionStorage.setItem('gantt', g); if (sessionStorage.getItem('gantt')) document.documentElement.dataset.gantt = sessionStorage.getItem('gantt'); } catch (e) {}</script><!-- the change of pages (components/PageTransition.astro): in <head>, its script must listen before the first paint --><script>
+         data-intro hides animated text until its intro takes it (set before the first paint) --><script>if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; document.documentElement.dataset.intro = 'on';</script><!-- Tests for the phone. The text (styles/air.css): ?air on the address turns it on for the visit, ?air=0 off. Back and forward without the
+         move of the change of pages (PageTransition.astro): ?back=instant, ?back=0 off --><script>try { const q = new URLSearchParams(location.search).get('air'); if (q !== null) q === '0' ? sessionStorage.removeItem('air') : sessionStorage.setItem('air', '1'); if (sessionStorage.getItem('air')) document.documentElement.dataset.air = ''; const b = new URLSearchParams(location.search).get('back'); if (b !== null) b === '0' ? sessionStorage.removeItem('back') : sessionStorage.setItem('back', b); } catch (e) {}</script><!-- the change of pages (components/PageTransition.astro): in <head>, its script must listen before the first paint --><script>
   (function () {
     // gl.fastInOut (motion.js, CustomEase 'M0,0 C0.094,0.026 0.124,0.127 0.157,0.29 0.197,0.486 0.254,0.8 0.348,0.884 0.42,0.949 0.374,1 1,1'), at 61 even steps of time
     var EASE = [0,0.0057,0.0139,0.0252,0.0407,0.062,0.091,0.1311,0.1857,0.2566,0.3378,0.4191,0.4971,0.5683,0.6328,0.6892,0.7388,0.7811,0.8167,0.8457,0.8686,0.886,0.9029,0.9208,0.9359,0.9469,0.955,0.9614,0.9665,0.9706,0.9741,0.9772,0.9798,0.982,0.9841,0.9859,0.9875,0.9889,0.9902,0.9913,0.9923,0.9932,0.9941,0.995,0.9955,0.9961,0.9967,0.9973,0.9978,0.9981,0.9984,0.9987,0.999,0.9993,0.9995,0.9996,0.9996,0.9997,0.9998,0.9999,1];
@@ -76,9 +76,17 @@
       setTimeout(show, LIMIT + 1000);   // whatever happens, never left hidden
     });
 
+    // A test for the iPhone (?back=instant, Base.astro): back and forward with no move at all, the page at once in its place. Safari shows a picture
+    // of the page it goes back to before any script of ours runs, and the move after it read as a lag (Maksim 16.11, twice); a link keeps its move
+    var instant = false;
+    try { instant = sessionStorage.getItem('back') === 'instant'; } catch (e) {}
+
     addEventListener('pagereveal', function (e) {
       var transition = e.viewTransition;
       if (!transition) { show(); return; }
+      if (instant && kept) { kept = false; transition.skipTransition(); show(); return; }
+      // loaded anew: the page going away stands until this one is in its place, then this one is there at once
+      if (instant && back) { transition.ready.then(ready).then(placed).then(function () { transition.skipTransition(); }, function () {}); return; }
       // those who ask for less motion: the next page simply shows
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) { transition.skipTransition(); show(); return; }
       if (kept) { kept = false; moving = true; transition.ready.then(function () { show(); return ready(); }).then(play, show); return; }
