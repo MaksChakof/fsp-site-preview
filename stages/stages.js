@@ -1,4 +1,5 @@
-// Build animation of the stages section, copied from prototypes/etapy-lineyka by site/tools/port-stages.py. Do not edit here.
+// Build animation of the stages section, first copied from prototypes/etapy-lineyka by site/tools/port-stages.py (03.11). Since 04.11 it is edited
+// here: the prototype is older, port-stages.py would bring back its old version (checked 24.11).
 /* Блок «Этапы и сроки» на доме Алексино (выставочный дом в Forest Club). Те же этапы и тот же рисунок, что в прототипе
    etapy-i-sroki, но дом настоящий: 34 детали с марками и монолит из IFC Максима (alexino-data.js, копия данных теста
    «Из чертежа в дом»). Порядок монтажа как в том тесте: север и запад, внутренние стены, фасад, плиты, стенки перепада, парапеты.
@@ -29,16 +30,21 @@ const ZK2 = qs.get('zk') !== '1';   // Максим 28.10: «пока остав
 /* ---------- этапы по наброску Максима Липатникова 16.10, недели стройки из 26 ---------- */
 // Новый дизайн (Фигма, кадр 219:896): справа список этапов с неделями, внизу слева линейка недель с меткой текущей
 // недели. Названия и недели этапов наши, принятые 26.10: на них собрана анимация. В макете стоят заглушки
-const WEEKS = ['00-04', '03-13', '12-14', '14-22', '21-26'];
-const WEEK_END = [4, 13, 14, 22, 26];
-const STAGES = ['Проект фундамента и панелей', 'Фундамент и завод', 'Монтаж', 'Перекрытие', 'Окна и кровля'];
+// 24.11, встреча с заказчиком 23.11: стройка 24 недели, ровно 6 месяцев (было 26, это 6,5 месяца), окна и кровля 21–24;
+// «Монтаж» называется «Стеновые панели» (Максим Липатников: «не монтаж, а стеновые панели, должно быть написано»)
+const WEEKS = ['00-04', '03-13', '12-14', '14-22', '21-24'];
+const WEEK_END = [4, 13, 14, 22, 24];
+const STAGES = ['Проект фундамента и панелей', 'Фундамент и завод', 'Стеновые панели', 'Перекрытие', 'Окна и кровля'];
 const ANIMATED = STAGES.length;
 // этап по сюжету; на самой остановке (конец этапа) — ещё этот этап, следующий загорается, когда тронулись
 const stageAt = p => clamp(Math.floor(p * ANIMATED - 1e-6), 0, ANIMATED - 1);
 // неделя стройки без округления. Максим 28.10: «чтобы всё равномерно шло, таймер плавнее относительно анимации».
 // Раньше неделя шла по сюжету этапа и стояла в его паузах. Теперь каждый этап — свой шаг прокрутки, и внутри шага
-// неделя идёт ровно по времени от конца прошлого этапа до конца этого (0 → 4 → 13 → 14 → 22 → 26)
+// неделя идёт ровно по времени от конца прошлого этапа до конца этого (0 → 4 → 13 → 14 → 22 → 24)
 const WEEKS_N = WEEK_END[ANIMATED - 1];
+// месяц на линейке — 4 недели: 24 недели — 6 месяцев. Счётчик над линейкой считает месяцы, под линейкой недели (Максим 24.11:
+// «цифры 0–24 снизу, сверху поменяй на месяцы… соотнеси их с неделями, чтобы всё чётко происходило»)
+const MONTH_W = 4, MONTHS_N = WEEKS_N / MONTH_W;
 const lerpBy = (xs, ys, x) => { for (let i = 1; i < xs.length; i++) if (x <= xs[i] || i === xs.length - 1) return lerp(ys[i - 1], ys[i], clamp((x - xs[i - 1]) / (xs[i] - xs[i - 1] || 1), 0, 1)); return ys[0]; };
 const weekNow = () => lerpBy(STOP_Q, STOP_W, pr.q);
 const qOfWeek = w => lerpBy(STOP_W, STOP_Q, clamp(w, 0, WEEKS_N));
@@ -67,10 +73,14 @@ function syncRows(p) {
 // на каждой неделе цифра стоит, а когда стебель проходит середину между неделями, за 0,4 недели плавно перекатывается
 // в следующую (тот же квадратичный in-out). Все перекаты одинаковые, через равное время. Десятки едут, только пока
 // единицы идут с 9 на 0, как в механическом счётчике. Два счётчика на одной ленте: в шапке и над стеблем
-const ROLL = 0.4;   // доля недели на перекат цифры
+// 24.11: счётчик показывает месяц стройки, одной цифрой из шести: 0 до начала, дальше идущий месяц. Цифра перекатывается, когда
+// стебель проходит начало месяца (неделю 4, 8…), за те же 0,4 недели, что был перекат недели
+// Максим 24.11, второй заход: «чтобы они листались хорошо, сейчас… не очень плавно» — перекат был 0,4 недели и щёлкал; теперь
+// 0,4 месяца (1,6 недели), той же долей шага, что была у недель
+const ROLL = 0.4;   // доля месяца на перекат цифры
 let wkTarget = 0, wkShown = -1;
 function odometer(el) {
-  const strips = [0, 1].map(k => {   // десятки 0…9, единицы 0…9 и снова 0, чтобы 9 уезжал в 0
+  const strips = [1].map(k => {   // одна лента единиц 0…9 и снова 0
     const mask = document.createElement('span'), roller = document.createElement('span');
     mask.setAttribute('data-odometer-part', 'mask'); mask.setAttribute('aria-hidden', 'true'); mask.style.height = '1em'; mask.style.lineHeight = 1;
     roller.setAttribute('data-odometer-part', 'roller'); roller.style.lineHeight = 1;
@@ -78,22 +88,18 @@ function odometer(el) {
     mask.appendChild(roller); return { mask, roller };
   });
   const text = document.createElement('span');   // число для экранного диктора
-  text.className = 'sr-only'; text.textContent = '00';
+  text.className = 'sr-only'; text.textContent = '0';
   el.replaceChildren(...strips.map(s => s.mask), text);
   return { strips, text };
 }
 const ODOS = [odometer($('etNum'))];
 function rollWeek() {
-  const w = weekNow(), n = Math.floor(w), r = Math.round(w);
-  if (r !== wkTarget) { wkTarget = r; for (const o of ODOS) o.text.textContent = String(r).padStart(2, '0'); }
-  const shown = Math.min(WEEKS_N, n + ease(ramp(0.5 - ROLL / 2, 0.5 + ROLL / 2, w - n)));
+  const m = weekNow() / MONTH_W, n = Math.floor(m), r = Math.min(MONTHS_N, Math.ceil(m - 1e-6));
+  if (r !== wkTarget) { wkTarget = r; for (const o of ODOS) o.text.textContent = String(r); }
+  const shown = Math.min(MONTHS_N, n + ease(ramp(0, ROLL, m - n)));
   if (Math.abs(shown - wkShown) < 1e-4) return;
   wkShown = shown;
-  const ones = shown % 10, tens = Math.floor(shown / 10) + clamp(ones - 9, 0, 1);
-  for (const o of ODOS) {
-    o.strips[0].roller.style.transform = `translate3d(0, ${-tens}em, 0)`;
-    o.strips[1].roller.style.transform = `translate3d(0, ${-ones}em, 0)`;
-  }
+  for (const o of ODOS) o.strips[0].roller.style.transform = `translate3d(0, ${-shown}em, 0)`;
 }
 
 /* ---------- линейка недель по Left Coast (StoryCarousel, leftcoast.refractweb.com/about) ---------- */
@@ -104,7 +110,8 @@ function rollWeek() {
 // с номером недели и этапом. Под мышью волна идёт за курсором, как у них; щелчок и протяжка по линейке ведут стройку
 // к этой неделе. Деления и подписи из макета: 53 через полнедели от x 20 до 705,2 (до линии ячейки 14,8).
 // Когда окно шире макета, ячейка и линейка растягиваются на половину окна, деления реже, волна в тех же делениях
-const R_X0 = 16, R_N = 53, R_PAD = 18.8;
+// 24.11: делений через полнедели столько, сколько недель стройки (49 на 24 недели, было 53 на 26), линейка той же длины
+const R_X0 = 16, R_N = WEEKS_N * 2 + 1, R_PAD = 18.8;
 // Радиус волны как у Left Coast: 160 px при шаге делений 25 px — 6,4 деления в каждую сторону. Волна широкая и пологая,
 // в ней 13 делений; в макете нарисована узкая (2,7 деления), Максим 28.10: «там сильно приятнее для глаз» — берём их
 const WAVE_A = 1.4, WAVE_STEPS = 160 / 25, BAR_K = 0.1;
@@ -113,9 +120,17 @@ const xOfWeek = w => R_X0 + w * 2 * R_STEP;
 const ruler = $('etRuler');
 const ticks = Array.from({ length: R_N }, () => { const el = document.createElement('div'); el.className = 'et-tick'; ruler.appendChild(el); return el; });
 const tickS = new Float32Array(R_N).fill(1), tickFut = new Uint8Array(R_N), tickO = new Float32Array(R_N).fill(1);
-const labels = Array.from({ length: 14 }, (_, k) => {
-  const el = document.createElement('div'); el.className = 'et-wl mono-scale' + (k ? (k === 13 ? ' last' : '') : ' first'); el.textContent = String(k * 2).padStart(2, '0');
-  ruler.appendChild(el); return { el, w: k * 2, o: 1 };
+// подписи под линейкой — месяцы 0…6 у крупных делений (Максим 24.11: «весь ползунок поменяем под месяцы, сделаем от нуля до шести…
+// саму анимацию оставляем такую же»; было 00…24 через две недели, и рядом со счётчиком месяцев было непонятно, что это за числа).
+// Деления и волна прежние, через полнедели; w — неделя, на которой стоит подпись
+const labels = Array.from({ length: MONTHS_N + 1 }, (_, k) => {
+  const el = document.createElement('div'); el.className = 'et-wl mono-scale' + (k ? (k === MONTHS_N ? ' last' : '') : ' first'); el.textContent = String(k);
+  ruler.appendChild(el); return { el, w: k * MONTH_W, o: 1 };
+});
+// крупные деления на началах месяцев (Максим Липатников 23.11: «и недели оставь, и ещё вот большие такие чёрточки и месяцы»):
+// своя линия над делением недели, волна их не тянет
+const months = Array.from({ length: MONTHS_N + 1 }, (_, k) => {
+  const el = document.createElement('div'); el.className = 'et-month'; ruler.appendChild(el); return { el, w: k * MONTH_W };
 });
 const stem = document.createElement('div'); stem.className = 'et-stem'; ruler.appendChild(stem);
 let hoverX = null, markOff = 0, nameW = STAGES.map(() => 120), rFirst = true;
@@ -124,6 +139,7 @@ function layoutRuler() {   // деления и подписи по ширине
   R_X1 = CELL_W - R_PAD; R_STEP = (R_X1 - R_X0) / (R_N - 1); WAVE_R = WAVE_STEPS * R_STEP;
   ticks.forEach((el, i) => { el.style.left = `calc(${(R_X0 + i * R_STEP).toFixed(2)} * var(--u))`; });
   for (const l of labels) l.el.style.left = `calc(${xOfWeek(l.w).toFixed(2)} * var(--u))`;
+  for (const m of months) m.el.style.left = `calc(${xOfWeek(m.w).toFixed(2)} * var(--u))`;
   rFirst = true;
 }
 function rulerFrame(dt) {
@@ -299,6 +315,14 @@ function trimAlong(a, i, b) {   // убрать из a часть, котору�
 const tang = e => e.ax === 'x' ? 2 : 0;
 const area = r => (r[1] - r[0]) * (r[3] - r[2]);
 fnd = fnd.filter(A => !fnd.some(B => B !== A && A.b[0] >= B.b[0] - EPS && A.b[1] <= B.b[1] + EPS && A.b[2] >= B.b[2] - EPS && A.b[3] <= B.b[3] + EPS && area(A.b) < area(B.b)));   // кусок внутри другого
+// Крыльцо на западе стояло отдельной плитой в 100 мм от фундамента, и с фасада между ними была прорезь (Максим 24.11: «промежуток
+// какой-то непонятный… лучше делаем монолитным полностью»). Плиты фундамента ближе 150 мм друг к другу смыкаем в одну
+for (const A of fnd) for (const B of fnd) {
+  if (A === B) continue;
+  const a = A.b, b = B.b, oy = a[2] < b[3] - EPS && b[2] < a[3] - EPS, ox = a[0] < b[1] - EPS && b[0] < a[1] - EPS;
+  if (oy && b[0] - a[1] > EPS && b[0] - a[1] < 3) a[1] = b[0];
+  if (ox && b[2] - a[3] > EPS && b[2] - a[3] < 3) a[3] = b[2];
+}
 for (const A of PANELS) for (const B of PANELS) {   // угол отдаём стене, которая идёт поперёк
   if (A === B || A.ax !== 'y' || B.ax !== 'x' || A.part === 'para' || B.part === 'para' || !over3(A.b, B.b)) continue;
   const a = A.b, b = B.b;
@@ -326,10 +350,91 @@ for (const A of PARAS) {   // парапет стоит на своей плит
   for (const s of roof) if (over3(a, s.b)) trimAlong(a, tang(A), s.b);
 }
 for (const A of PARAS) for (const B of [...PARAS, ...PANELS.filter(e => e.part !== 'para' && e.b[4] > 30)]) if (A !== B && A.b[5] <= B.b[5] && over3(A.b, B.b)) trimAlong(A.b, tang(A), B.b);
+// Бортики кровли и стенки перепада смыкаем (Максим 24.11: «щель… в кровле сверху… промежуток… пятно… это всё убивает премиальность»):
+// между стенкой перепада и бортиком верхней кровли была щель 140 мм, в ней с фасада виден край плиты; между бортиками — по 20 мм,
+// двойные линии на стыках. Если между двумя такими деталями на одной высоте меньше 200 мм, правая (северная) дотягивается до левой
+{
+  const RIM = [...PARAS, PAN['НС-114'], PAN['НС-115']];
+  for (const A of RIM) for (const B of RIM) {
+    if (A === B) continue;
+    const a = A.b, b = B.b;
+    if (!(a[4] < b[5] - EPS && b[4] < a[5] - EPS)) continue;
+    if (a[2] < b[3] - EPS && b[2] < a[3] - EPS && a[0] - b[1] > EPS && a[0] - b[1] < 4) a[0] = b[1];
+    if (a[0] < b[1] - EPS && b[0] < a[1] - EPS && a[2] - b[3] > EPS && a[2] - b[3] < 4) a[2] = b[3];
+  }
+}
 const FOUND = fnd.map(s => box('found', s.b, { flat: true }));
 const FLOOR = flr.map(s => box('floor', s.b, { flat: true }));
 const ROOF = roof.map(s => box(s.beam ? 'beam' : 'slab', s.b, { flat: !s.beam }));
 const LOW = ROOF.filter(e => e.kind === 'slab' && e.b[5] < 65), HIGH = ROOF.filter(e => e.kind === 'slab' && e.b[5] >= 65), BEAMS = ROOF.filter(e => e.kind === 'beam');
+// Жёлоб нижней кровли перед верхним объёмом — полоса 1,3 м между передним бортиком и верхней кровлей. Под свесом верхней плиты
+// он уходил вглубь, к рёбрам, и в эту щель было видно всё, что за ней. Закрываем её тонкой стенкой под свесом (100 мм, как бортик),
+// вровень с бортиком верхней кровли, от стенки перепада до углового бортика; угловой бортик упирается в неё. Стенка перепада стоит
+// на нижней плите (в IFC она начиналась на 200 мм выше, и под её торцом в жёлобе была дыра)
+// (Максим 24.11, с рисунком: «сделай такую же тонкую перегородку, как и все… доведи её до конца»; блок во всю ширину жёлоба отклонён).
+// Мембрана в жёлобе — та же мембрана нижней кровли (см. MEMB): вырезать жёлоб из неё нельзя, поперёк входа в жёлоб вставал её край,
+// а линия раскатки в жёлобе обрывалась (Максим 24.11: «взялась тут линия», «почему она… тормознулась»)
+const LOW_TOP = LOW[0].b[5];
+for (const e of [PAN['НС-114'], PAN['НС-115']]) e.b[4] = Math.min(e.b[4], LOW_TOP);
+const EAVE_WALL = (() => {
+  const corner = PAN['ПП-101'].b, high = PAN['ПП-115'].b, step = PAN['НС-114'].b;
+  const e = box('panel', [step[1], corner[1], high[2], HIGH[0].b[2], LOW_TOP, high[4]], { m: 'стенка под свесом', part: 'para', ax: 'x', ops: [], rings: [] });
+  PARAS.push(e);
+  // Ниже низа бортика верхней кровли стенка под свесом и торец стенки перепада — одна заливка без линий: ни линии по низу стенки
+  // в жёлобе, ни рёбер стенки перепада под этой высотой; по стенке перепада на этой высоте — линия низа (quiet; Максим 24.11, рисунок
+  // в Paint: эти линии стёрты, на торце стенки перепада дорисована линия)
+  e.quiet = high[4]; PAN['НС-114'].quiet = high[4];
+  // Угловой бортик идёт дальше на север тем же сечением, пока с камеры юго-востока его наружное верхнее ребро не встанет на верх бортика
+  // верхней кровли: оба верхних ребра продолжены прямо, без излома, торец ложится на верх бортика верхней кровли, угол — одна вертикаль,
+  // ниже неё линии бортика и навеса (Максим 24.11, третий рисунок в Paint: «повтори все, что нарисовал. Только выровняй»).
+  // Сдвиг на север, при котором точка ребра на высоте corner[5] ложится на ребро на высоте high[5]: (high[5] − corner[5]) · sin φ / tg ε.
+  // Подъём на последних 600 мм давал излом и шёл круче рисунка — отклонён
+  corner[3] = high[2] + (high[5] - corner[5]) * Math.sin(VW.se.phi) / Math.tan(VW.se.eps);
+  // Вторая тонкая линия под линией низа бортика верхней кровли, через весь жёлоб: продолжение линии навеса справа от углового бортика
+  // (низ плиты верхней кровли, y HIGH[0].b[2], z HIGH[0].b[4]), с камеры юго-востока на одной прямой с ней; лежит на торце стенки
+  // перепада и стенке под свесом, на высоте, где та линия видна на их плоскости: + Δy · tg ε / sin φ. Слева её доводит до линии низа
+  // бортика ребро стенки перепада (Максим 24.11, четвёртый рисунок, красным: «добавь еще одну тонкую линию, которую я тебе тоже
+  // рисовал… совмести ее с той, которая идет у нас с другой стороны»; на третьем рисунке она была чёрной под линией низа бортика)
+  const mark = HIGH[0].b[4] + (HIGH[0].b[2] - high[2]) * Math.tan(VW.se.eps) / Math.sin(VW.se.phi);
+  e.mark = mark; e.markFrom = step[0]; e.markWith = PAN['НС-114']; PAN['НС-114'].mark = mark; PAN['НС-114'].markEdge = true;
+  // стенка перепада падает одним верхом над линией низа бортика, низ встаёт с ней (drawItem, upTo)
+  for (const s of [PAN['НС-114'], PAN['НС-115']]) { s.upTo = high[4]; s.upWith = PAN['НС-114']; }
+  // Стенка под свесом не падает с окантовкой: она стоит с начала этапа кровли, и линия навеса в жёлобе есть всегда, как справа
+  // от углового бортика, а бортики падают на неё чистыми (Максим 24.11: «линия снизу… у нас есть всегда и она просто присоединяет
+  // к себе эти борта»). С камеры юго-востока её линия совпадает с линией низа плиты, которая уже видна, — появление незаметно.
+  // Рисуется только лицевая грань: верх и торец закрыты бортиками, а до них лишние линии и разрыв линии плиты (state, EAVE_WALL.u)
+  e.faces = ['front'];
+  e.x0 = e.b[0];   // её настоящий левый край; до стенки перепада state сдвигает его к углу плиты
+  return e;
+})();
+// Монолитные плиты (встреча 23.11, Максим 24.11: фундамент «монолитный, чтобы он не был разделен на… четыре секции», нижнее перекрытие
+// «одной заливкой, так же как верхнее», кровля так же). Плита из IFC разрезана на прямоугольники по вырезам: кусками её проще ставить
+// в порядок отрисовки со стенами, но каждый кусок рисовал свой контур, и по плите шли линии стыков. Куски остаются, а у каждого видны
+// только края, которые лежат на общем контуре плиты, и вертикальные рёбра только в его углах: плита читается одним телом
+function slabGroup(list) {
+  const out = outline(list.map(e => e.b));
+  const corner = new Set(out.loops.flatMap(l => l.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`)));
+  for (const e of list) {
+    const b = e.b, ex = { x0: [], x1: [], y0: [], y1: [] };   // открытые отрезки каждой стороны куска: на них стоит общий контур
+    for (const s of out.sides) {
+      const alongX = Math.abs(s.a[1] - s.b[1]) < EPS;
+      const k = alongX ? (s.n[1] < 0 ? 'y0' : 'y1') : (s.n[0] < 0 ? 'x0' : 'x1');
+      const line = { y0: b[2], y1: b[3], x0: b[0], x1: b[1] }[k], at = alongX ? s.a[1] : s.a[0];
+      if (Math.abs(at - line) > EPS) continue;
+      const i = alongX ? 0 : 1, lo = Math.max(alongX ? b[0] : b[2], Math.min(s.a[i], s.b[i])), hi = Math.min(alongX ? b[1] : b[3], Math.max(s.a[i], s.b[i]));
+      if (hi - lo > EPS) ex[k].push([lo, hi]);
+    }
+    e.sl = { ex, corner };
+  }
+}
+// Нижняя плита кровли: кусок у южного бортика кончался на 120 мм раньше соседнего (178,6 против 181), и с фасада под верхней кровлей
+// торчал уголок плиты (Максим 24.11: «непонятная пятно снизу на крыше»). Соседние куски, чьи концы расходятся меньше чем на 150 мм,
+// выравниваем по дальнему
+for (const A of LOW) for (const B of LOW) if (A !== B && (Math.abs(A.b[3] - B.b[2]) < EPS || Math.abs(A.b[2] - B.b[3]) < EPS)) {
+  if (B.b[1] - A.b[1] > EPS && B.b[1] - A.b[1] < 3) A.b[1] = B.b[1];
+  if (A.b[0] - B.b[0] > EPS && A.b[0] - B.b[0] < 3) A.b[0] = B.b[0];
+}
+for (const g of [FOUND, FLOOR, LOW, HIGH]) slabGroup(g);
 const HB = [-30, 312, -22, 316, GZ, 85];   // охват дома
 const HC = [(HB[0] + HB[1]) / 2, (HB[2] + HB[3]) / 2];
 for (const e of PANELS) e.ext = e.ax === 'x' ? Math.sign((e.b[0] + e.b[1]) / 2 - HC[0]) || 1 : Math.sign((e.b[2] + e.b[3]) / 2 - HC[1]) || 1;   // где улица
@@ -491,11 +596,50 @@ function project(t, fade) {
   });
   const sy = ease(ramp(0.3, 1, t)); if (sy <= 0) return;
   const o = { mode: 'ghost', fillA: 0, a, scan: lerp(SCAN[0], SCAN[1], sy) };
-  for (const e of els) item(e.b, Object.assign({ e: e.kind === 'panel' ? e : null }, o));
+  for (const e of els) item(e.b, Object.assign({ e: e.kind === 'panel' ? e : null, sl: e.sl || null }, o));
 }
 
 /* ---------- фундамент: опалубка по контуру, сетка, бетон идёт фронтом через всю плиту, опалубку снимают ---------- */
 const FOUT = outline(FOUND.map(e => e.b));
+
+/* ---------- котлован под фундамент (24.11) ---------- */
+// Максим Липатников 23.11: «по-хорошему, там вообще котлован должен быть… вот эта линия, она с откосами должна быть… и глубину…
+// как толщина фундамента. Это же символически всё». Максим 24.11: «небольшой котлован… вниз он идёт… отрисовываем чертежами, чтобы
+// вниз шли полоски». Третий заход 24.11, с чертежом плана котлована из интернета: «поглубже… линии идут прям вниз… такую же высоту,
+// как… на крыше… огородочки (парапеты), и вот они абсолютно так же отрисованы, только без лишних линий по промежуткам… вниз линии идут
+// исключительно по углам и снизу завершающие, чтобы мы видели это как 3Dшную модель… чётко, красиво, ровно».
+// Котлован — коробка, вдавленная в землю: бровка на уровне земли рисунка (низ фундамента: там же участок и завод), отвесные стенки
+// на высоту парапета кровли (600 мм), на 250 мм шире фундамента. Линии как у парапетов: бровка целиком, вертикальные рёбра в углах и
+// низ стенок — и только то, что видно камере: у ближних стенок дно и рёбра закрыты землёй. Точка на глубине видна, если луч от неё
+// к камере выходит на землю внутри котлована и по дороге не уходит под землю. На плане стенки сходятся в бровку и не рисуются
+const PIT_TOP = GZ, PIT_GAP = 5, PIT_D = 12, PIT_BOT = PIT_TOP - PIT_D;   // PIT_D — высота парапета (62…74)
+const PIT_RECTS = FOUND.map(e => [e.b[0] - PIT_GAP, e.b[1] + PIT_GAP, e.b[2] - PIT_GAP, e.b[3] + PIT_GAP]);
+const PIT = outline(PIT_RECTS);
+const inPit = (x, y) => PIT_RECTS.some(r => x > r[0] - 0.05 && x < r[1] + 0.05 && y > r[2] - 0.05 && y < r[3] + 0.05);
+function pitSeen(x, y, z) {
+  const h = PIT_TOP - z; if (h <= 1e-6) return true;
+  const c = h * CE / Math.max(SE, 1e-3);   // насколько луч к камере уходит вбок, пока поднимается на h
+  for (let s = 0.15; s <= 1.001; s += 0.17) if (!inPit(x - FX * c * s, y - FY * c * s)) return false;
+  return true;
+}
+function seenRuns(p, q, n) {   // видимые куски отрезка p → q, по n шагам
+  const runs = []; let cur = null;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, v = [lerp(p[0], q[0], t), lerp(p[1], q[1], t), lerp(p[2], q[2], t)];
+    if (pitSeen(v[0], v[1], v[2])) { if (cur) cur[1] = v; else { cur = [v]; runs.push(cur); } } else cur = null;
+  }
+  return runs.filter(r => r.length === 2);
+}
+function pit(k, a) {   // k: насколько проступил чертёж котлована, a: прозрачность
+  if (k <= 0 || a <= 0) return;
+  const kr = ease(ramp(0, 0.6, k)), kh = ease(ramp(0.35, 1, k)), tilt = 1 - ramp(0.9, 0.99, SE);
+  for (const l of PIT.loops) ground({ pts: l.map(p => [p[0], p[1], PIT_TOP]), color: INK, part: kr, a });   // бровка
+  if (kh <= 0 || tilt <= 0) return;
+  for (const l of PIT.loops) for (const p of l)   // рёбра в углах растут сверху вниз
+    for (const r of seenRuns([p[0], p[1], PIT_TOP], [p[0], p[1], PIT_BOT], 24)) ground({ pts: r, close: false, color: INK, part: kh, a: a * tilt });
+  for (const s of PIT.sides)   // низ стенок
+    for (const r of seenRuns([s.a[0], s.a[1], PIT_BOT], [s.b[0], s.b[1], PIT_BOT], Math.ceil(Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1])))) ground({ pts: r, close: false, color: INK, part: kh, a: a * tilt });
+}
 // фронт бетона — прямая x = s поперёк дома, от западного края к восточному, как ложится мембрана кровли (Максим 28.10: «не из
 // угла, а от одного края, ровным слоем»). Было по диагонали x + y = s, из угла
 const sweepRange = rs => { let a = 1e9, b = -1e9; for (const r of rs) { a = Math.min(a, r[0]); b = Math.max(b, r[1]); } return [a - 2, b + 2]; };
@@ -520,7 +664,7 @@ function frontLine(rects, s, z) { for (const r of rects) if (s > r[0] && s < r[1
 function foundation(t) {   // появляется контур и сразу идёт бетон фронтом, без бортов и сетки; после заливки контур растворяется
   const tr = ramp(0, 0.3, t), rs = FOUND.map(e => e.b), pw = ramp(0.15, 0.9, t), [s0, s1] = sweepRange(rs), s = lerp(s0, s1, ease(pw));
   const ca = 1 - ramp(0.9, 1, t);   // после заливки контур растворяется
-  if (tr > 0 && ca > 0) for (const l of FOUT.loops) ground({ pts: l.map(p => [p[0], p[1], GZ]), color: INK, part: tr, a: ca });
+  // 24.11: контур фундамента на земле больше не рисуем — его место занял котлован (pit), а два контура рядом с бровкой двоили линии
   if (pw > 0) {
     for (const e of [...FOUND, ...FLOOR]) { e.s.on = true; if (pw < 1) e.s.cut = s; }
     if (pw < 1) frontLine(FLOOR.map(e => e.b), s, 0);
@@ -615,11 +759,16 @@ function stubs(k) {   // выпуски из фундамента с заглу�
   const y = -6.4 - 8 * e;
   item([38.4, 41.6, y, -6.4, -6.6, -3.4], { util: true }); item([37.8, 42.2, y - 1.2, y, -7.2, -2.8], { util: true });
 }
-function fanPipe(k) {   // фановая труба над низкой кровлей
+// Фановая труба над низкой кровлей. 24.11 (Максим: «ты потерял пимпочку от трубы сверху… она просто квадратиком. А потом она
+// появляется… такого быть не должно»): труба стояла от верха плиты, ниже мембраны, и мембрана ложилась поверх неё — с юго-востока
+// от трубы оставался квадратик оголовка; а оголовок появлялся рывком, когда труба доросла. Теперь труба стоит на мембране (её низ
+// выше на 0,1 — так порядок отрисовки однозначный: сначала кровля, потом труба) и растёт сразу с оголовком
+const FAN_Z = 62.4;
+function fanPipe(k) {
   if (k <= 0) return;
-  const z = 62 + 14 * ease(k);
-  item([FAN[0] - 3, FAN[0] + 3, FAN[1] - 3, FAN[1] + 3, 62, z], { util: true });
-  if (k >= 1) item([FAN[0] - 4.5, FAN[0] + 4.5, FAN[1] - 4.5, FAN[1] + 4.5, z, z + 1.6], { util: true });
+  const z = FAN_Z + 14 * ease(k);
+  item([FAN[0] - 3, FAN[0] + 3, FAN[1] - 3, FAN[1] + 3, FAN_Z, z], { util: true });
+  item([FAN[0] - 4.5, FAN[0] + 4.5, FAN[1] - 4.5, FAN[1] + 4.5, z, z + 1.6], { util: true });
 }
 function zaklXray(t, back = 0) {
   const g = ramp(0, 0.35, t) * (1 - back), na = 1 - back;   // Максим 30.10: наплыв 0,33 с туда и 0,65 с обратно (было 0,13 и 0,26 с)
@@ -642,15 +791,53 @@ function flyWindow(w, k) {   // окно подлетает к проёму с �
   const sh = b => [b[0] + off[0], b[1] + off[0], b[2] + off[1], b[3] + off[1], b[4], b[5]];
   item(sh(w.b), { w, cur: sh(w.b), inner: sh(w.ib), target: w.b, a: ramp(0, 0.15, k), draw: drawWinFly });
 }
-// мембрана внутри парапетов: по наружному краю плиты отступаем, чтобы не зайти под парапет
-function membraneRects(parts, out) {
-  const onEdge = (x0, y0, x1, y1) => out.sides.some(({ a, b }) => Math.abs(a[0] - b[0]) < EPS ? Math.abs(x0 - a[0]) < EPS && Math.abs(x1 - a[0]) < EPS && Math.max(y0, Math.min(a[1], b[1])) < Math.min(y1, Math.max(a[1], b[1])) : Math.abs(y0 - a[1]) < EPS && Math.abs(y1 - a[1]) < EPS && Math.max(x0, Math.min(a[0], b[0])) < Math.min(x1, Math.max(a[0], b[0])));
-  return parts.map(e => {
-    const r = e.b.slice(0, 4), d = 3.6;
-    return [onEdge(r[0], r[2], r[0], r[3]) ? r[0] + d : r[0], onEdge(r[1], r[2], r[1], r[3]) ? r[1] - d : r[1], onEdge(r[0], r[2], r[1], r[2]) ? r[2] + d : r[2], onEdge(r[0], r[3], r[1], r[3]) ? r[3] - d : r[3], e.b[5] + 0.3];
-  });
+// Мембрана внутри парапетов (24.11): открытая часть кровли — плита без того, что накрыто верхней плитой и стенками перепада, — и от её
+// контура везде отступ 3,6, чтобы не зайти под парапет. Было: каждый кусок плиты отступал от своих краёв на общем контуре, и два узких
+// куска над стенами под верхней кровлей отступом съедались целиком: поперёк нижней кровли оставались две щели (Максим 24.11: кровля
+// «на три деления… чтобы нижняя крыша тоже была монолитна, без вот этих полосок лишних»)
+const MEMB_D = 3.6;
+function erode(rects, d) {   // часть области, из которой квадрат ±d вокруг точки не выходит; прямоугольниками
+  const inR = (x, y) => rects.some(r => x > r[0] && x < r[1] && y > r[2] && y < r[3]);
+  const X0 = [...new Set(rects.flatMap(r => [r[0], r[1]]))], Y0 = [...new Set(rects.flatMap(r => [r[2], r[3]]))];
+  const xs = [...new Set(X0.flatMap(x => [x - d, x + d]))].sort((a, b) => a - b), ys = [...new Set(Y0.flatMap(y => [y - d, y + d]))].sort((a, b) => a - b);
+  const fits = (cx, cy) => {   // квадрат вокруг точки целиком в области: каждая его клетка по сетке области внутри
+    const qx = [cx - d, ...X0.filter(x => x > cx - d && x < cx + d), cx + d].sort((a, b) => a - b);
+    const qy = [cy - d, ...Y0.filter(y => y > cy - d && y < cy + d), cy + d].sort((a, b) => a - b);
+    for (let i = 0; i < qx.length - 1; i++) for (let j = 0; j < qy.length - 1; j++) if (!inR((qx[i] + qx[i + 1]) / 2, (qy[j] + qy[j + 1]) / 2)) return false;
+    return true;
+  };
+  const out = [];
+  for (let j = 0; j < ys.length - 1; j++) {
+    if (ys[j + 1] - ys[j] < EPS) continue;
+    const cy = (ys[j] + ys[j + 1]) / 2, runs = [];
+    for (let i = 0; i < xs.length - 1; i++) {
+      if (xs[i + 1] - xs[i] < EPS || !fits((xs[i] + xs[i + 1]) / 2, cy)) continue;
+      const last = runs[runs.length - 1];
+      if (last && Math.abs(last[1] - xs[i]) < EPS) last[1] = xs[i + 1]; else runs.push([xs[i], xs[i + 1]]);
+    }
+    for (const [a, b] of runs) {   // такие же отрезки строкой выше — один прямоугольник
+      const prev = out.find(q => Math.abs(q[0] - a) < EPS && Math.abs(q[1] - b) < EPS && Math.abs(q[3] - ys[j]) < EPS);
+      if (prev) prev[3] = ys[j + 1]; else out.push([a, b, ys[j], ys[j + 1]]);
+    }
+  }
+  return out;
 }
-const MEMB = [...membraneRects(LOW, LOUT), ...membraneRects(HIGH, HOUT)];
+// Отступ 3,6 — только у бортиков по краю кровли. К тому, что стоит на нижней кровле — верхний объём, стенки перепада, стенка под свесом,
+// угловой бортик жёлоба, — мембрана подходит вплотную, её край там закрыт ими или совпадает с их низом: эти места сначала присоединяем
+// к кровле, сужаем всё на 3,6 и потом вырезаем их. Был отступ и у стенок — в углу у стенки перепада торчал огрызок края (Максим 24.11)
+const ON_LOW = [...HIGH.map(e => e.b), PAN['НС-114'].b, PAN['НС-115'].b, EAVE_WALL.b, PAN['ПП-101'].b].map(b => b.slice(0, 4));
+const lowMemb = erode([...LOW.map(e => e.b.slice(0, 4)), ...ON_LOW], MEMB_D).flatMap(r => rectsMinus(r, ON_LOW));
+// куски мембраны одной плитой на каждой кровле, как сами плиты, и раскатываются одним фронтом через всю кровлю
+const MEMB = [[lowMemb, LOW[0].b[5]], [erode(HIGH.map(e => e.b.slice(0, 4)), MEMB_D), HIGH[0].b[5]]].flatMap(([rs, z]) => {
+  const g = rs.filter(r => r[1] - r[0] > EPS && r[3] - r[2] > EPS).map(r => ({ b: [r[0], r[1], r[2], r[3], z + 0.3, z + 0.3] })); slabGroup(g); return g;
+});
+const MEMB_X = sweepRange(MEMB.map(m => m.b));
+// Край мембраны вдоль стенки под свесом и торца стенки перепада не рисуем: он совпадал с низом стенки, а низ стенки теперь без линии
+// (quiet) — край проступал тонкой чертой (Максим 24.11: эти линии стёрты на его рисунке)
+{
+  const y = EAVE_WALL.b[2], x0 = PAN['НС-114'].b[0], x1 = EAVE_WALL.b[1];
+  for (const m of MEMB) if (Math.abs(m.b[3] - y) < EPS) m.sl.ex.y1 = m.sl.ex.y1.flatMap(([lo, hi]) => [[lo, Math.min(hi, x0)], [Math.max(lo, x1), hi]]).filter(([lo, hi]) => hi - lo > EPS);
+}
 
 /* ---------- сюжет ---------- */
 function state(p) {
@@ -663,11 +850,18 @@ function state(p) {
   const facA = 1 - ramp(0.45, 0.6, t3);
   const fade = ramp(0, 0.2, t2);   // чертёж гаснет, когда начинают фундамент
   if (t1 > 0 && fade < 1) project(t1, fade);
+  // котлован проступает на проекте вслед за осями, стоит, пока льют фундамент, и растворяется вместе с его контуром
+  pit(t2 > 0 ? 1 : ramp(0.05, 0.6, t1), 1 - ramp(0.9, 1, t2));
   foundation(t2);   // фундамент и завод идут одновременно, весь этап
   LIFT = ramp(0, 0.5, t3);
   MONT.forEach((e, k) => { e.u = seq(LIFT, k, MONT.length, 0.6); });   // стены краном сверху почти разом
   const roofK = ramp(0, 0.6, t5);   // окна и окантовка кровли встают одновременно
   EDGE.forEach((e, k) => { e.u = seq(roofK, k, EDGE.length, 0.6); });   // окантовка почти разом, от дальних
+  // Стенка под свесом стоит с начала кровли, без подлёта (см. EAVE_WALL). Пока не встала стенка перепада, она начинается там, где с камеры
+  // видна вертикаль угла плиты верхней кровли: её левое ребро и линия навеса продолжают угол плиты, не заходя за него обрезком
+  // (Максим 24.11: «какой-то обрезок слева снизу у стены»)
+  EAVE_WALL.u = t5 > 0 ? 1 : 0;
+  EAVE_WALL.b[0] = PAN['НС-114'].u >= 1 ? EAVE_WALL.x0 : Math.max(EAVE_WALL.x0, HIGH[0].b[0] - FX * (HIGH[0].b[2] - EAVE_WALL.b[2]) / FY);
   if (facA > 0) {
     ground({ pts: rectZ(PAD, GZ), dash: true, a: facA });
     ground({ pts: rectZ(PLOT, GZ), dash: true, a: facA });
@@ -685,7 +879,23 @@ function state(p) {
     w.done = kk >= 1; if (kk > 0 && kk < 1) flyWindow(w, kk);
   });
   const mb = ramp(0.6, 0.9, t5);
-  if (mb > 0) for (const r of MEMB) item([r[0], lerp(r[0] + 0.6, r[1], ease(mb)), r[2], r[3], r[4], r[4]], { top: true });
+  if (mb > 0) {   // было: каждый кусок мембраны раскатывался от своего края, и между кусками стояли линии
+    const s = lerp(MEMB_X[0], MEMB_X[1], ease(mb));
+    for (const m of MEMB) if (m.b[0] < s) item(m.b, { top: true, sl: m.sl, cut: mb < 1 ? s : null });
+    // линия фронта по каждому куску мембраны. Раньше она рисовалась поверх всего и шла сквозь бортики, которые ближе к нам (Максим 24.11:
+    // «не была видна за передними для нас перегородками… вернуть линию»): теперь это тело рисунка со своим местом в порядке отрисовки,
+    // чуть выше мембраны — ближние бортики её закрывают, мембрана под ней не закрывает
+    if (mb < 1) for (const m of MEMB) if (s > m.b[0] && s < m.b[1]) {
+      const z = m.b[4] + 0.05;
+      item([s, s, m.b[2], m.b[3], z, z], { p: [s, m.b[2], z], q: [s, m.b[3], z], draw: drawFront });
+      // в жёлобе низ стенки без линии, и линия обрывалась в пустоте: она идёт дальше прямо, тем же направлением, до линии под бортиком
+      // верхней кровли — с камеры юго-востока на одной прямой с линией фронта по ту сторону верхнего объёма. Прежде она заворачивала
+      // вверх по стенке, и на стыке был излом (Максим 24.11, четвёртый рисунок: «Убери вот этот изгиб… совмести ее с той, которая идет
+      // у нас с другой стороны»). Для порядка отрисовки она стоит у стенки, как прежний загиб: стенка под ней, бортики перед ней
+      const y = EAVE_WALL.b[2], top = EAVE_WALL.quiet;
+      if (Math.abs(m.b[3] - y) < EPS && s > PAN['НС-114'].b[0] && s < EAVE_WALL.b[1]) item([s, s, y, y, z, top], { p: [s, y, z], q: [s, y + (top - z) * Math.sin(VW.se.phi) / Math.tan(VW.se.eps), z], draw: drawFront });
+    }
+  }
   fanPipe(ramp(0.9, 1, t5));
 }
 
@@ -812,6 +1022,10 @@ function drawWinFly(it) {
   ctx.beginPath(); path(rectOn(ax, plane, O)); path(rectOn(ax, plane, r)); ctx.stroke();
   ctx.restore();
 }
+function drawFront(it) {   // линия фронта мембраны (см. state, «Окна и кровля»)
+  ctx.save(); ctx.globalAlpha = 1; ctx.strokeStyle = INK; ctx.setLineDash([]); ctx.lineWidth = LW;
+  ctx.beginPath(); seg(it.p, it.q); ctx.stroke(); ctx.restore();
+}
 function drawMesh(it) {   // прутки сетки одним путём, видны только впереди фронта бетона
   ctx.save(); ctx.globalAlpha = it.a; ctx.strokeStyle = GHOST; ctx.setLineDash([]); ctx.lineWidth = LW;
   if (it.front != null) clipHalf(it.front, it.segs[0][0][2], true);
@@ -824,6 +1038,27 @@ function drawDots(b, [nx, ny, a]) {
     const q = P(lerp(b[0], b[1], (i + 0.5) / nx), lerp(b[2], b[3], (j + 0.5) / ny), b[5]);
     ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, Math.PI * 2); ctx.fill();
   }
+}
+// кусок монолитной плиты (slabGroup): верх заливается целиком, видимые торцы — только открытые отрезки; линии — только общий контур
+// плиты по верху и низу и вертикальные рёбра в его углах. Стыки кусков не видны ни по верху, ни по торцам
+const onLine = (k, u, fixed, z) => k[0] === 'y' ? [u, fixed, z] : [fixed, u, z];
+function slabPiece(it) {
+  const b = it.cb, ex = it.sl.ex, z0 = b[4], z1 = b[5], fixed = { x0: b[0], x1: b[1], y0: b[2], y1: b[3] };
+  const sides = it.top ? [] : [FY > 0 ? 'y0' : 'y1', FX > 0 ? 'x0' : 'x1'];   // торцы, которые смотрят на нас, как FACE.front и FACE.side
+  ctx.beginPath(); path(FACE.top(b));
+  for (const k of sides) for (const [lo, hi] of ex[k]) path([onLine(k, lo, fixed[k], z0), onLine(k, hi, fixed[k], z0), onLine(k, hi, fixed[k], z1), onLine(k, lo, fixed[k], z1)]);
+  ctx.globalAlpha = it.a * it.fillA; ctx.fill();
+  // по стыку двух кусков сглаживание оставляет полупрозрачный край заливки, и сквозь него точками проступали линии стен под плитой
+  // (снимок 24.11): заливку обводим цветом листа, общий контур ниже ложится поверх
+  if (it.fillA > 0) { ctx.strokeStyle = CELL; ctx.stroke(); ctx.strokeStyle = it.mode === 'solid' ? INK : GHOST; }
+  ctx.globalAlpha = it.a;
+  ctx.beginPath();
+  for (const k of ['x0', 'x1', 'y0', 'y1']) for (const [lo, hi] of ex[k]) seg(onLine(k, lo, fixed[k], z1), onLine(k, hi, fixed[k], z1));
+  for (const k of sides) for (const [lo, hi] of ex[k]) {
+    seg(onLine(k, lo, fixed[k], z0), onLine(k, hi, fixed[k], z0));
+    for (const u of [lo, hi]) { const p = onLine(k, u, fixed[k], z0); if (it.sl.corner.has(`${p[0].toFixed(2)},${p[1].toFixed(2)}`)) seg(p, onLine(k, u, fixed[k], z1)); }
+  }
+  ctx.stroke();
 }
 function drawItem(it) {
   if (it.draw) { it.draw(it); return; }
@@ -845,9 +1080,40 @@ function drawItem(it) {
       if (-(fc[0] - cen[0]) * FX * CE - (fc[1] - cen[1]) * FY * CE + (fc[2] - cen[2]) * SE <= 1e-6) continue;   // грань смотрит от нас
       fillStroke(q, it.a * it.fillA, it.a);
     }
-  } else {
-    const faces = it.top ? ['top'] : ['top', 'front', 'side'];
-    for (const f of faces) fillStroke(FACE[f](it.cb), it.a * it.fillA, it.a);
+  } else if (it.sl) slabPiece(it);
+  else {
+    let faces = it.top ? ['top'] : (it.e && it.e.faces) || ['top', 'front', 'side'];
+    // quiet: ниже этой высоты (со сдвигом детали на подлёте) торцы только заливаются, без линий; выше — как всегда, с линией низа
+    const q = it.e && it.e.quiet != null ? Math.min(it.cb[5], it.e.quiet + it.cb[4] - it.e.b[4]) : null;
+    // Пока стенка перепада не встала, обе её панели — только верх над линией низа бортика (upTo), чистой коробкой, как бортик: низ в жёлобе
+    // без линий двигался невидимой заливкой и стирал линию навеса, её кусок линии навеса и ребро болтались отдельно, а у второй панели
+    // на стыке открывался торец низа (Максим 24.11: «какой-то обрезок слева снизу у стены… Они должны просто падать чисто бордюры»).
+    // Низ с линией навеса встаёт вместе со стенкой
+    if (it.e && it.e.upTo != null && it.e.upWith.u < 1) {
+      const hb = it.cb.slice(); hb[4] = Math.min(it.cb[5], it.e.upTo + it.cb[4] - it.e.b[4]);
+      if (hb[5] - hb[4] > EPS) for (const f of ['top', 'front', 'side']) fillStroke(FACE[f](hb), it.a * it.fillA, it.a);
+      faces = [];
+    }
+    for (const f of faces) {
+      if (q === null || f === 'top' || q <= it.cb[4]) { fillStroke(FACE[f](it.cb), it.a * it.fillA, it.a); continue; }
+      const lo = it.cb.slice(), hi = it.cb.slice(); lo[5] = q; hi[4] = q;
+      // край заливки обводим цветом листа: иначе сквозь сглаживание точками проступал край мембраны за стенкой
+      ctx.beginPath(); path(FACE[f](lo)); ctx.globalAlpha = it.a * it.fillA; ctx.fill();
+      if (it.fillA > 0) { ctx.strokeStyle = CELL; ctx.stroke(); ctx.strokeStyle = it.mode === 'solid' ? INK : GHOST; }
+      ctx.globalAlpha = it.a;
+      if (hi[5] - hi[4] > EPS) fillStroke(FACE[f](hi), it.a * it.fillA, it.a);
+    }
+    // линия навеса по торцу стенки перепада и стенке под свесом (mark, см. EAVE_WALL); у стенки перепада — её ребро до этой линии
+    if (it.e && it.e.mark != null && q !== null && it.cb[4] - it.e.b[4] <= EPS) {
+      // стенка под свесом ведёт линию от самого края стенки перепада (markFrom), когда та уже стоит: её заливка рисуется позже
+      // и съедала стык двух кусков
+      const b = it.cb, z = it.e.mark + b[4] - it.e.b[4], y = yf(b);
+      const x0 = it.e.markFrom != null && it.e.markWith.u >= 1 ? it.e.markFrom + b[0] - it.e.b[0] : b[0];
+      ctx.beginPath(); seg([x0, y, z], [b[1], y, z]);
+      // ребро у левого края: у стенки перепада всегда; у стенки под свесом — пока стенки перепада нет, это низ угла плиты (см. state)
+      if (it.e.markEdge || (it.e.markWith && it.e.markWith.u < 1)) seg([b[0], y, z], [b[0], y, q]);
+      ctx.stroke();
+    }
   }
   if (it.e && it.e.ops && it.e.ops.length) drawOpenings(it.e, it.cb, it);
   if (it.dots) drawDots(it.cb, it.dots);
@@ -881,7 +1147,7 @@ function render() {
   ITEMS = []; GROUND = []; OVER = []; POST = null;
   for (const e of els) e.s = { on: false, mode: 'solid', a: 1, fillA: 1, off: [0, 0, 0], cut: null };
   state(p);
-  for (const e of els) if (e.s.on && e.s.a > 0.001) item(cur(e), { e: e.kind === 'panel' ? e : null, mode: e.s.mode, a: e.s.a, fillA: e.s.fillA, cut: e.s.cut });
+  for (const e of els) if (e.s.on && e.s.a > 0.001) item(cur(e), { e: e.kind === 'panel' ? e : null, sl: e.sl || null, mode: e.s.mode, a: e.s.a, fillA: e.s.fillA, cut: e.s.cut });
   if (POST) for (const it of ITEMS) POST(it);
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = CELL; ctx.fillRect(0, 0, cv.width, cv.height);
   ctx.setTransform(U * DPR, 0, 0, U * DPR, 0, 0);
@@ -979,8 +1245,13 @@ function go(dir) {   // жест: следующий этап или назад 
 }
 // щелчок по этапу (Максим 30.10: «не начинать этап, а просто перемещаться на него»): стройка едет к остановке этапа
 // (его конец — как после шага прокрутки), по секундам стройки: 26 недель за 2,5 с, как «Пропустить», не короче 0,6 с
+// LEAD: страница, где стройку ведёт прокрутка (src/scripts/stages.js, Дима 04.11). Щелчок по этапу и линейка там не играют стройку
+// сами, а прокручивают страницу к своему месту, и стройка идёт за прокруткой (Максим 24.11: «пропала возможность ползунок двигать
+// руками… нажимая на этапы, они больше не переходят к этому этапу… это должно быть на месте»): секунды стройки и протяжка или щелчок
+let LEAD = null;
 function goStage(i) {
   if (FORCE !== null) return;
+  if (LEAD) { LEAD(TAU[i + 1], false); return; }
   const q1 = STOP_Q[i + 1];
   if (RM) { pr.q = q1; setP(storyP(q1)); return; }
   if (Math.abs(pr.q - q1) < 1e-6) return;
@@ -1018,9 +1289,10 @@ if (FORCE !== null) skip.hidden = true;
 skip.addEventListener('click', () => { if (P_now < 1) playTo(1, 2.5, ease, true, 't'); });
 
 /* ---------- линейка под мышью: волна за курсором, щелчок и протяжка ведут стройку к неделе ---------- */
-const weekOfX = clientX => { const r = ruler.getBoundingClientRect(); return clamp(((clientX - r.left) / U - R_X0) / (2 * R_STEP), 0, 26); };
+const weekOfX = clientX => { const r = ruler.getBoundingClientRect(); return clamp(((clientX - r.left) / U - R_X0) / (2 * R_STEP), 0, WEEKS_N); };
 function goWeek(w, drag) {
   const q = qOfWeek(w);
+  if (LEAD && FORCE === null) { LEAD(SPACE.t.of(q), drag); return; }
   if (FORCE !== null || RM) { pr.q = q; setP(storyP(q)); return; }
   // протяжка: догон 0,1 за кадр по неделям; щелчок: изинг пропуска, 26 недель за 2,5 с, но не короче 0,6 с
   if (drag) { if (tw) { tw.kill(); tw = null; } if (chaseW === null) wCur = weekNow(); playing = false; chaseW = clamp(w, 0, WEEKS_N); }
@@ -1049,5 +1321,5 @@ ruler.addEventListener('pointercancel', e => { if (dragId === e.pointerId) dragI
 let rsT = 0;
 addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(sizeAll, 120); });
 
-window.__stagesEngine = { seek: t => { if (tw) { tw.kill(); tw = null; } chaseW = null; playing = false; pr.q = SPACE.t.to(t); setP(storyP(pr.q)); }, setP: p => { setP(p); render(); }, get p() { return P_now; }, get q() { return pr.q; }, get playing() { return playing; }, get week() { return wkTarget; }, STEP_S, TAU, get weekShown() { return wkShown; }, weekNow, qOfP, goWeek, go, els, WINS, storyP, SCROLL_PX, PLAY_S };
+window.__stagesEngine = { set lead(f) { LEAD = f; }, seek: t => { if (tw) { tw.kill(); tw = null; } chaseW = null; playing = false; pr.q = SPACE.t.to(t); setP(storyP(pr.q)); }, setP: p => { setP(p); render(); }, get p() { return P_now; }, get q() { return pr.q; }, get playing() { return playing; }, get week() { return wkTarget; }, STEP_S, TAU, get weekShown() { return wkShown; }, weekNow, qOfP, goWeek, go, els, WINS, storyP, SCROLL_PX, PLAY_S };
 })();
